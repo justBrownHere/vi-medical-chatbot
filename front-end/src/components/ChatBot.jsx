@@ -1,18 +1,19 @@
 // import avatar from "../assets/avatar.jpg";
-import robot_img from "../assets/robot_image.png";
+import chatbot from "../assets/images/chatbot.png";
 import { useState, useRef, useEffect } from "react";
 import ScaleLoader from "react-spinners/ScaleLoader";
 import { TypeAnimation } from "react-type-animation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMessage } from "@fortawesome/free-regular-svg-icons";
+import { getStorage, setStorage } from "../utils";
 function ChatBot(props) {
   const messagesEndRef = useRef(null);
   const [timeOfRequest, SetTimeOfRequest] = useState(0);
   let [promptInput, SetPromptInput] = useState("");
   let [sourceData, SetSourceData] = useState("vi-medical");
-  let [chatHistory, SetChatHistory] = useState([]);
+  let [chatHistory, SetChatHistory] = useState(getStorage('chat-history') ?? []);
 
-  const commonQuestions=[
+  const commonQuestions = [
     "Dấu hiệu bị nhiễm COVID-19",
     "Phòng tránh gan nhiễm mỡ",
     "Phải làm gì khi bị kiến ba khoan cắn",
@@ -51,15 +52,18 @@ function ChatBot(props) {
       SetIsGen(true), SetPromptInput("");
       SetIsLoad(true);
       SetDataChat((prev) => [...prev, ["end", [promptInput, sourceData]]]);
-      SetChatHistory((prev) => [promptInput, ...prev]);
+      SetChatHistory((prev) => {
+        setStorage('chat-history', [promptInput, ...prev])
+        return [promptInput, ...prev]
+      });
 
       fetch("https://ruling-plainly-jaguar.ngrok-free.app/rag/" + sourceData + "?q=" + promptInput,
-      {
-        method: "get",
-        headers: new Headers({
-          "ngrok-skip-browser-warning": "69420",
-        }),
-      })
+        {
+          method: "get",
+          headers: new Headers({
+            "ngrok-skip-browser-warning": "69420",
+          }),
+        })
         .then((response) => response.json())
         .then((result) => {
           SetDataChat((prev) => [
@@ -94,7 +98,7 @@ function ChatBot(props) {
       title:
         sourceType == "wiki"
           ? sources.metadata.title
-          : sources.metadata.page==undefined? "Cẩm nang bệnh học" : "",
+          : sources.metadata.page == undefined ? "Cẩm nang bệnh học" : "",
       source: sourceType == "wiki" ? "Wikipedia" : "Cẩm nang bệnh học",
       url:
         sourceType == "wiki"
@@ -105,12 +109,12 @@ function ChatBot(props) {
     });
   };
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-purple-100 h-[85vh] ">
+    <div className="bg-gradient-to-r from-blue-50 to-purple-100 h-[calc(100vh-72px)]">
       <div className="hidden lg:block  drawer-side absolute w-64 h-[20vh] left-3 mt-2 drop-shadow-md">
         <div className="menu p-4 w-full min-h-full bg-gray-50 text-base-content rounded-2xl mt-3  overflow-auto scroll-y-auto max-h-[80vh]">
           {/* Sidebar content here */}
           <ul className="menu text-sm">
-            <h2 className="font-bold mb-2 bg-[linear-gradient(90deg,hsl(var(--s))_0%,hsl(var(--sf))_9%,hsl(var(--pf))_42%,hsl(var(--p))_47%,hsl(var(--a))_100%)] bg-clip-text will-change-auto [-webkit-text-fill-color:transparent] [transform:translate3d(0,0,0)] motion-reduce:!tracking-normal max-[1280px]:!tracking-normal [@supports(color:oklch(0_0_0))]:bg-[linear-gradient(90deg,hsl(var(--s))_4%,color-mix(in_oklch,hsl(var(--sf)),hsl(var(--pf)))_22%,hsl(var(--p))_45%,color-mix(in_oklch,hsl(var(--p)),hsl(var(--a)))_67%,hsl(var(--a))_100.2%)] ">
+            <h2 className="font-bold mb-2  text-emerald-600">
               Lịch sử trò chuyện
             </h2>
             {chatHistory.length == 0 ? (
@@ -134,7 +138,7 @@ function ChatBot(props) {
       <div className="hidden lg:block  drawer-side absolute w-64 h-[20vh] mt-2 right-3 drop-shadow-md">
         <div className="menu p-4 w-full min-h-full bg-gray-50 text-base-content rounded-2xl mt-3">
           {/* Sidebar content here */}
-          <h2 className="font-bold text-sm mb-2 bg-[linear-gradient(90deg,hsl(var(--s))_0%,hsl(var(--sf))_9%,hsl(var(--pf))_42%,hsl(var(--p))_47%,hsl(var(--a))_100%)] bg-clip-text will-change-auto [-webkit-text-fill-color:transparent] [transform:translate3d(0,0,0)] motion-reduce:!tracking-normal max-[1280px]:!tracking-normal [@supports(color:oklch(0_0_0))]:bg-[linear-gradient(90deg,hsl(var(--s))_4%,color-mix(in_oklch,hsl(var(--sf)),hsl(var(--pf)))_22%,hsl(var(--p))_45%,color-mix(in_oklch,hsl(var(--p)),hsl(var(--a)))_67%,hsl(var(--a))_100.2%)] ">
+          <h2 className="font-bold text-sm mb-2 text-emerald-600">
             Nguồn tham khảo
           </h2>
           <ul className="menu">
@@ -151,7 +155,7 @@ function ChatBot(props) {
                   onChange={(e) => {
                     SetSourceData(e.target.value);
                   }}
-                  className="radio checked:bg-blue-500"
+                  className="radio checked:bg-emerald-500"
                 />
               </label>
             </li>
@@ -168,7 +172,7 @@ function ChatBot(props) {
                     SetSourceData(e.target.value);
                   }}
                   name="radio-10"
-                  className="radio checked:bg-blue-500"
+                  className="radio checked:bg-emerald-500 selection:bg-emerald-400"
                 />
               </label>
             </li>
@@ -183,7 +187,7 @@ function ChatBot(props) {
         >
           {/* Sidebar content here */}
           <ul className="menu text-sm">
-            <h2 className="font-bold mb-2 bg-[linear-gradient(90deg,hsl(var(--s))_0%,hsl(var(--sf))_9%,hsl(var(--pf))_42%,hsl(var(--p))_47%,hsl(var(--a))_100%)] bg-clip-text will-change-auto [-webkit-text-fill-color:transparent] [transform:translate3d(0,0,0)] motion-reduce:!tracking-normal max-[1280px]:!tracking-normal [@supports(color:oklch(0_0_0))]:bg-[linear-gradient(90deg,hsl(var(--s))_4%,color-mix(in_oklch,hsl(var(--sf)),hsl(var(--pf)))_22%,hsl(var(--p))_45%,color-mix(in_oklch,hsl(var(--p)),hsl(var(--a)))_67%,hsl(var(--a))_100.2%)] ">
+            <h2 className="font-bold mb-2 text-emerald-600">
               Những câu hỏi phổ biến
             </h2>
 
@@ -236,16 +240,15 @@ function ChatBot(props) {
               <div className="chat chat-start drop-shadow-md" key={i}>
                 <div className="chat-image avatar">
                   <div className="w-10 rounded-full border-2 border-blue-500">
-                    <img className="scale-150" src={robot_img} />
+                    <img className="scale-150" src={chatbot} />
                   </div>
                 </div>
-                <div className="chat-bubble chat-bubble-info colo break-words ">
+                <div className="chat-bubble chat-bubble-info colo break-words bg-emerald-300">
                   <TypeAnimation
-                    style={{ whiteSpace: 'pre-line' }} 
                     sequence={[
                       // () => ScrollToEndChat(),
                       dataMessages[1][0]
-                      
+
                       ,
                       () => SetIsGen(false),
                       // SetIsLoad(false),
@@ -265,7 +268,7 @@ function ChatBot(props) {
                     speed={100}
                   />
                   {dataMessages[1][1] === null ||
-                  dataMessages[1][1].length == 0 ? (
+                    dataMessages[1][1].length == 0 ? (
                     ""
                   ) : (
                     <>
@@ -283,7 +286,7 @@ function ChatBot(props) {
                           >
                             {dataMessages[1][2] == "wiki"
                               ? source.metadata.title
-                              : source.metadata.page==undefined? "Cẩm nang sức khoẻ" : ""}
+                              : source.metadata.page == undefined ? "Cẩm nang sức khoẻ" : ""}
                           </label>
                         ))}
                       </p>
@@ -294,11 +297,11 @@ function ChatBot(props) {
             ) : (
               <div className="chat chat-end">
                 {/* bg-gradient-to-r from-cyan-500 to-blue-500 */}
-                <div className="chat-bubble shadow-xl chat-bubble-primary bg-gradient-to-r from-purple-500 to-blue-500 text-white">
+                <div className="chat-bubble shadow-xl chat-bubble-primary bg-emerald-300 text-black">
                   {dataMessages[1][0]}
                   <>
                     <div className="divider m-0"></div>
-                    <p className="font-light text-xs text-cyan-50">
+                    <p className="font-light text-xs text-black">
                       Tham khảo:{" "}
                       {dataMessages[1][1] == "wiki" ? "Wikipedia" : "Cẩm nang sức khoẻ"}
                     </p>
@@ -310,11 +313,11 @@ function ChatBot(props) {
           {isLoading ? (
             <div className="chat chat-start">
               <div className="chat-image avatar">
-                <div className="w-10 rounded-full border-2 border-blue-500">
-                  <img src={robot_img} />
+                <div className="w-10 rounded-full border-2 border-emerald-500">
+                  <img src={chatbot} />
                 </div>
               </div>
-              <div className="chat-bubble chat-bubble-info">
+              <div className="chat-bubble chat-bubble-info bg-emerald-300">
                 <ScaleLoader
                   color="#000000"
                   loading={true}
@@ -334,7 +337,7 @@ function ChatBot(props) {
             <input
               type="text"
               placeholder="Nhập câu hỏi tại đây..."
-              className="mr-1 shadow-xl border-2 focus:outline-none px-2 rounded-2xl input-primary col-start-1 md:col-end-12 col-end-11 "
+              className="mr-1 shadow-xl border-2 focus:outline-none px-2 rounded-2xl border-emerald-600 col-start-1 md:col-end-12 col-end-11 "
               onChange={onChangeHandler}
               onKeyDown={handleKeyDown}
               disabled={isGen}
@@ -345,8 +348,11 @@ function ChatBot(props) {
               disabled={isGen}
               onClick={() => SendMessageChat()}
               className={
-                " drop-shadow-md md:col-start-12 rounded-2xl col-start-11 col-end-12 md:col-end-13 btn btn-active btn-primary btn-square bg-gradient-to-tl from-transparent via-blue-600 to-indigo-500"
+                "md:col-start-12 rounded-2xl col-start-11 col-end-12 md:col-end-13 btn-square btn"
               }
+              style={{
+                backgroundColor: 'rgb(52 211 153)'
+              }}
             >
               <svg
                 stroke="currentColor"

@@ -18,7 +18,7 @@ function App() {
       <div className="overflow-hidden">
         <NavBar />
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<HomePage />} />
           <Route path="chat" element={<ChatBot />} />
           <Route path="issue" element={<IssuePage />} />
           <Route path="faq" element={<FAQPage />} />
