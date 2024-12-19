@@ -87,27 +87,27 @@ function ChatBot(props) {
       SendMessageChat();
     }
   };
-  let [reference, SetReference] = useState({
-    title: "",
-    source: "",
-    url: "",
-    text: ``,
-  });
-  const handleReferenceClick = (sources, sourceType) => {
-    SetReference({
-      title:
-        sourceType == "wiki"
-          ? sources.metadata.title
-          : sources.metadata.page == undefined ? "Cẩm nang bệnh học" : "",
-      source: sourceType == "wiki" ? "Wikipedia" : "Cẩm nang bệnh học",
-      url:
-        sourceType == "wiki"
-          ? sources.metadata.source
-          : "https://tamanhhospital.vn/benh/",
-      text:
-        sourceType == "wiki" ? sources.metadata.summary : sources.page_content,
-    });
-  };
+  // let [reference, SetReference] = useState({
+  //   title: "",
+  //   source: "",
+  //   url: "",
+  //   text: ``,
+  // });
+  // const handleReferenceClick = (sources, sourceType) => {
+  //   SetReference({
+  //     title:
+  //       sourceType == "wiki"
+  //         ? sources.metadata.title
+  //         : sources.metadata.page == undefined ? "Cẩm nang bệnh học" : "",
+  //     source: sourceType == "wiki" ? "Wikipedia" : "Cẩm nang bệnh học",
+  //     url:
+  //       sourceType == "wiki"
+  //         ? sources.metadata.source
+  //         : "https://tamanhhospital.vn/benh/",
+  //     text:
+  //       sourceType == "wiki" ? sources.metadata.summary : sources.page_content,
+  //   });
+  // };
   return (
     <div className="bg-gradient-to-r from-blue-50 to-purple-100 h-[calc(100vh-72px)]">
       <div className="hidden lg:block  drawer-side absolute w-64 h-[20vh] left-3 mt-2 drop-shadow-md">
@@ -209,15 +209,15 @@ function ChatBot(props) {
         <input type="checkbox" id="my_modal_6" className="modal-toggle" />
         <div className="modal">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">{reference.title}</h3>{" "}
-            <p className="font-normal text-sm">Nguồn: {reference.source}</p>
+            {/* <h3 className="font-bold text-lg">{reference.title}</h3>{" "} */}
+            {/* <p className="font-normal text-sm">Nguồn: {reference.source}</p> */}
             <p className="py-4 text-sm">
-              {reference.text.slice(0, 700) + "..."}
+              {/* {reference.text.slice(0, 700) + "..."} */}
             </p>
             <p className="link link-primary truncate">
-              <a href={reference.url} target="_blank">
+              {/* <a href={reference.url} target="_blank">
                 {reference.url}
-              </a>
+              </a> */}
             </p>
             <div className="modal-action">
               <label htmlFor="my_modal_6" className="btn btn-error">
@@ -273,7 +273,7 @@ function ChatBot(props) {
                   ) : (
                     <>
                       <div className="divider m-0"></div>
-                      <p className="font-semibold text-xs">
+                      {/* <p className="font-semibold text-xs">
                         Tham khảo:{" "}
                         {dataMessages[1][1].map((source, j) => (
                           <label
@@ -289,7 +289,7 @@ function ChatBot(props) {
                               : source.metadata.page == undefined ? "Cẩm nang sức khoẻ" : ""}
                           </label>
                         ))}
-                      </p>
+                      </p> */}
                     </>
                   )}
                 </div>
