@@ -11,3 +11,7 @@ export const getStorage = (key) => {
     return stringItem;
   }
 };
+
+export const removeStorage = (key) => {
+  localStorage.removeItem(key)
+}

@@ -6,6 +6,8 @@ import { TypeAnimation } from "react-type-animation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMessage } from "@fortawesome/free-regular-svg-icons";
 import { getStorage, setStorage } from "../utils";
+
+// getStorage('chat-history') ?? []
 function ChatBot(props) {
   const messagesEndRef = useRef(null);
   const [timeOfRequest, SetTimeOfRequest] = useState(0);
@@ -20,7 +22,11 @@ function ChatBot(props) {
   ]
   let [isLoading, SetIsLoad] = useState(false);
   let [isGen, SetIsGen] = useState(false);
-  const [dataChat, SetDataChat] = useState([
+  const [dataChat, SetDataChat] = useState({
+  id: new Date().getTime(),
+  name: 'New Chat',
+  context: [],
+  chats: [
     [
       "start",
       [
@@ -28,7 +34,9 @@ function ChatBot(props) {
         null,
       ],
     ],
-  ]);
+  ]
+  });
+
   useEffect(() => {
     ScrollToEndChat();
   }, [isLoading]);
@@ -46,16 +54,30 @@ function ChatBot(props) {
     SetPromptInput(event.target.value);
   };
 
-  async function SendMessageChat() {
+  console.log(dataChat)
+
+   function SendMessageChat() {
     if (promptInput !== "" && isLoading === false) {
       SetTimeOfRequest(0);
       SetIsGen(true), SetPromptInput("");
       SetIsLoad(true);
-      SetDataChat((prev) => [...prev, ["end", [promptInput, sourceData]]]);
-      SetChatHistory((prev) => {
-        setStorage('chat-history', [promptInput, ...prev])
-        return [promptInput, ...prev]
-      });
+      SetDataChat((prev) => ({...prev, name: prev.chats?.[1]?.[1] || promptInput, chats:[...prev.chats, ["end", [promptInput, sourceData]]]}));
+      SetChatHistory(prev => {
+        let copyArray = [...prev]
+       const chatIndex =  copyArray.findIndex(chat => chat.id === dataChat.id)
+       if(chatIndex > -1) {
+        copyArray[chatIndex] = ({...dataChat,chats:[...dataChat.chats, ["end", [promptInput, sourceData]]] })
+        setStorage('chat-history',copyArray)
+        return copyArray
+       } else {
+        setStorage('chat-history',[...copyArray, {...dataChat,chats:[...dataChat.chats, ["end", [promptInput, sourceData]]] }])
+        return [...copyArray, {...dataChat,chats:[...dataChat.chats, ["end", [promptInput, sourceData]]] }]
+       }
+      })
+     
+      // SetChatHistory((prev) => {
+      //   return [{message: promptInput, id: new Date().getTime()}, ...prev]
+      // });
 
       fetch("https://ruling-plainly-jaguar.ngrok-free.app/rag/" + sourceData + "?q=" + promptInput,
         {
@@ -66,17 +88,19 @@ function ChatBot(props) {
         })
         .then((response) => response.json())
         .then((result) => {
-          SetDataChat((prev) => [
-            ...prev,
+          SetDataChat((prev) => ({...prev, chats:[
+            ...prev.chats,
             ["start", [result.result, result.source_documents, sourceData]],
-          ]);
+
+          ]}));
           SetIsLoad(false);
         })
         .catch((error) => {
-          SetDataChat((prev) => [
-            ...prev,
+          SetDataChat((prev) => ({...prev, chats:[
+            ...prev.chats,
             ["start", ["Lỗi, không thể kết nối với server", null]],
-          ]);
+
+          ]}));
           SetIsLoad(false);
         });
     }
@@ -108,12 +132,32 @@ function ChatBot(props) {
         sourceType == "wiki" ? sources.metadata.summary : sources.page_content,
     });
   };
+
+  const onAddChat = () => {
+    SetDataChat({
+      id: new Date().getTime(),
+      name: 'New chat',
+      chats: [
+        [
+          "start",
+          [
+            "Xin chào! Đây là Vi Medical Chatbot, Bạn đang có thắc mắc gì về vấn đề sức khoẻ - y tế?",
+            null,
+          ],
+        ],
+      ]
+      })
+  }
+
   return (
     <div className="bg-gradient-to-r from-blue-50 to-purple-100 h-[calc(100vh-72px)]">
       <div className="hidden lg:block  drawer-side absolute w-64 h-[20vh] left-3 mt-2 drop-shadow-md">
         <div className="menu p-4 w-full min-h-full bg-gray-50 text-base-content rounded-2xl mt-3  overflow-auto scroll-y-auto max-h-[80vh]">
           {/* Sidebar content here */}
           <ul className="menu text-sm">
+            <button style={{backgroundColor: 'rgb(52, 211, 153)'}} className="rounded-md p-2" onClick={onAddChat}>
+              Add new chat
+            </button>
             <h2 className="font-bold mb-2  text-emerald-600">
               Lịch sử trò chuyện
             </h2>
@@ -124,11 +168,11 @@ function ChatBot(props) {
             ) : (
               ""
             )}
-            {chatHistory.map((mess, i) => (
-              <li key={i}>
+            {chatHistory.map((chat, i) => (
+              <li key={i} onClick={() => SetDataChat(chat)}>
                 <p>
                   <FontAwesomeIcon icon={faMessage} />
-                  {mess.length < 20 ? mess : mess.slice(0, 20) + "..."}
+                  {chat.name.length < 20 ? chat.name : chat.name.slice(0, 20) + "..."}
                 </p>
               </li>
             ))}
@@ -235,7 +279,7 @@ function ChatBot(props) {
           scrollbar-thumb-rounded-full scrollbar-track-rounded-full
           rounded-3xl border-2 md:w-[50%] md:p-3 p-1  w-full overflow-auto scroll-y-auto h-[80%] "
         >
-          {dataChat.map((dataMessages, i) =>
+          {dataChat.chats.map((dataMessages, i) =>
             dataMessages[0] === "start" ? (
               <div className="chat chat-start drop-shadow-md" key={i}>
                 <div className="chat-image avatar">
@@ -273,7 +317,7 @@ function ChatBot(props) {
                   ) : (
                     <>
                       <div className="divider m-0"></div>
-                      <p className="font-semibold text-xs">
+                      {/* <p className="font-semibold text-xs">
                         Tham khảo:{" "}
                         {dataMessages[1][1].map((source, j) => (
                           <label
@@ -289,7 +333,7 @@ function ChatBot(props) {
                               : source.metadata.page == undefined ? "Cẩm nang sức khoẻ" : ""}
                           </label>
                         ))}
-                      </p>
+                      </p> */}
                     </>
                   )}
                 </div>

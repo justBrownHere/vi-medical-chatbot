@@ -5,7 +5,7 @@ import HomePage from "./pages/HomePage";
 import ChatBot from "./components/ChatBot";
 import FAQPage from "./pages/FAQPage"
 import IssuePage from "./pages/IssuePage";
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 // import ImgGen from "./components/ImgGen";
 import ScaleLoader from "react-spinners/ScaleLoader";
 // import { decode as atob, encode as btoa } from "js-base64";
@@ -18,6 +18,7 @@ function App() {
       <div className="overflow-hidden">
         <NavBar />
         <Routes>
+          <Route path="/" element={<Navigate to="/chat" replace/>} />
           <Route path="/home" element={<HomePage />} />
           <Route path="chat" element={<ChatBot />} />
           <Route path="issue" element={<IssuePage />} />
