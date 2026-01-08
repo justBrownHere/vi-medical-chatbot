@@ -4,8 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import ScaleLoader from "react-spinners/ScaleLoader";
 import { TypeAnimation } from "react-type-animation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMessage } from "@fortawesome/free-regular-svg-icons";
+import { faMessage, faTrashAlt, faEdit } from "@fortawesome/free-regular-svg-icons";
 import { getStorage, setStorage } from "../utils";
+
+// API Base URL
+const API_BASE_URL = "https://ruling-plainly-jaguar.ngrok-free.app";
 
 // getStorage('chat-history') ?? []
 function ChatBot(props) {
@@ -14,6 +17,9 @@ function ChatBot(props) {
   let [promptInput, SetPromptInput] = useState("");
   let [sourceData, SetSourceData] = useState("vi-medical");
   let [chatHistory, SetChatHistory] = useState(getStorage('chat-history') ?? []);
+  const [currentSessionId, setCurrentSessionId] = useState(new Date().getTime());
+  const [editingChatId, setEditingChatId] = useState(null);
+  const [editingChatName, setEditingChatName] = useState("");
 
   const commonQuestions = [
     "Dấu hiệu bị nhiễm COVID-19",
@@ -24,7 +30,7 @@ function ChatBot(props) {
   let [isGen, SetIsGen] = useState(false);
   const [dataChat, SetDataChat] = useState({
   id: new Date().getTime(),
-  name: 'New Chat',
+  name: 'New chat',  // ✅ Giống ChatGPT - lowercase 'c'
   context: [],
   chats: [
     [
@@ -54,55 +60,196 @@ function ChatBot(props) {
     SetPromptInput(event.target.value);
   };
 
+
+
   console.log(dataChat)
 
-   function SendMessageChat() {
+  // Helper function để extract chat history từ dataChat
+  const extractChatHistory = (chats) => {
+    const history = [];
+    for (let i = 0; i < chats.length; i++) {
+      if (chats[i][0] === "end" && chats[i + 1] && chats[i + 1][0] === "start") {
+        history.push({
+          question: chats[i][1][0],
+          answer: chats[i + 1][1][0]
+        });
+      }
+    }
+    return history;
+  };
+
+  // Helper function để check xem có nên lưu vào history không
+  const shouldSaveToHistory = (answer) => {
+    if (!answer) return false;
+    
+    // Patterns của non-medical responses (greeting, irrelevant, error)
+    const skipPatterns = [
+      // Greeting patterns
+      /^xin chào/i,
+      /^chào bạn/i,
+      /^hello/i,
+      /^hi/i,
+      /tôi là vi-?medical/i,
+      
+      // Irrelevant patterns
+      /câu hỏi.*không liên quan/i,
+      /không liên quan.*y tế/i,
+      /không thể tư vấn/i,
+      /chỉ có thể tư vấn về sức khỏe/i,
+      
+      // Error patterns
+      /lỗi.*không thể kết nối/i,
+      /không thể kết nối.*server/i,
+      /^⚠️.*lỗi/i,
+    ];
+    
+    // Nếu match một trong các patterns → KHÔNG lưu
+    for (const pattern of skipPatterns) {
+      if (pattern.test(answer)) {
+        return false;
+      }
+    }
+    
+    // Default: lưu vào history
+    return true;
+  };
+
+  // Helper function để generate chat title
+  const generateChatTitle = async (question) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/generate-title`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "69420",
+        },
+        body: JSON.stringify({ question }),
+        signal: AbortSignal.timeout(5000)  // Timeout 5s
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.title;
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Error generating title:", error);
+    }
+    
+    // Fallback: Lấy 6 từ đầu
+    const words = question.split(' ').slice(0, 6);  // FIX: split(' ') với space
+    return words.join(" ") + (question.split(' ').length > 6 ? "..." : "");
+  };
+
+  function SendMessageChat() {
     if (promptInput !== "" && isLoading === false) {
       SetTimeOfRequest(0);
-      SetIsGen(true), SetPromptInput("");
+      SetIsGen(true);
+      const currentQuestion = promptInput;
+      SetPromptInput("");
       SetIsLoad(true);
-      SetDataChat((prev) => ({...prev, name: prev.chats?.[1]?.[1] || promptInput, chats:[...prev.chats, ["end", [promptInput, sourceData]]]}));
-      SetChatHistory(prev => {
-        let copyArray = [...prev]
-       const chatIndex =  copyArray.findIndex(chat => chat.id === dataChat.id)
-       if(chatIndex > -1) {
-        copyArray[chatIndex] = ({...dataChat,chats:[...dataChat.chats, ["end", [promptInput, sourceData]]] })
-        setStorage('chat-history',copyArray)
-        return copyArray
-       } else {
-        setStorage('chat-history',[...copyArray, {...dataChat,chats:[...dataChat.chats, ["end", [promptInput, sourceData]]] }])
-        return [...copyArray, {...dataChat,chats:[...dataChat.chats, ["end", [promptInput, sourceData]]] }]
-       }
-      })
-     
-      // SetChatHistory((prev) => {
-      //   return [{message: promptInput, id: new Date().getTime()}, ...prev]
-      // });
-
-      fetch("https://ruling-plainly-jaguar.ngrok-free.app/rag/" + sourceData + "?q=" + promptInput,
-        {
-          method: "get",
-          headers: new Headers({
-            "ngrok-skip-browser-warning": "69420",
-          }),
-        })
-        .then((response) => response.json())
-        .then((result) => {
-          SetDataChat((prev) => ({...prev, chats:[
-            ...prev.chats,
-            ["start", [result.result, result.source_documents, sourceData]],
-
-          ]}));
-          SetIsLoad(false);
-        })
-        .catch((error) => {
-          SetDataChat((prev) => ({...prev, chats:[
-            ...prev.chats,
-            ["start", ["Lỗi, không thể kết nối với server", null]],
-
-          ]}));
-          SetIsLoad(false);
+      
+      // Lấy session_id từ dataChat
+      const sessionId = dataChat.id;
+      setCurrentSessionId(sessionId);
+      
+      // Kiểm tra nếu là câu hỏi đầu tiên (chỉ có greeting message)
+      const isFirstQuestion = dataChat.chats.length === 1;
+      
+      // Tạo updated dataChat với câu hỏi mới
+      const updatedDataChat = {
+        ...dataChat,
+        name: dataChat.name,  // ✅ Giữ nguyên "New chat" ban đầu
+        chats: [...dataChat.chats, ["end", [currentQuestion, sourceData]]]
+      };
+      
+      SetDataChat(updatedDataChat);
+      
+      // ✅ Generate title nếu là câu hỏi đầu tiên - GIỐNG CHATGPT
+      if (isFirstQuestion) {
+        // Gọi API generate title sau khi đã có response
+        generateChatTitle(currentQuestion).then(title => {
+          if (title) {
+            console.log(`📝 Generated title: ${title}`);
+            SetDataChat(prev => ({ ...prev, name: title }));
+            // Update trong history nếu đã có
+            SetChatHistory(prevHistory => {
+              const updated = prevHistory.map(chat => 
+                chat.id === sessionId ? { ...chat, name: title } : chat
+              );
+              setStorage('chat-history', updated);
+              return updated;
+            });
+          }
+        }).catch(err => {
+          console.error("Failed to generate title:", err);
+          // Fallback nếu API fail hoàn toàn - giữ "New chat"
         });
+      }
+
+      // Gọi API với session_id
+      fetch(`${API_BASE_URL}/rag/${sourceData}?q=${encodeURIComponent(currentQuestion)}&session_id=${sessionId}`, {
+        method: "get",
+        headers: new Headers({
+          "ngrok-skip-browser-warning": "69420",
+        }),
+      })
+      .then((response) => response.json())
+      .then((result) => {
+        // Thêm response vào dataChat
+        SetDataChat((prev) => {
+          const newDataChat = {
+            ...prev,
+            chats: [
+              ...prev.chats,
+              ["start", [result.result, result.source_documents, sourceData]],
+            ]
+          };
+          
+          // ✅ CHỈ lưu vào history nếu là câu hỏi y tế
+          if (shouldSaveToHistory(result.result)) {
+            SetChatHistory(prevHistory => {
+              let copyArray = [...prevHistory]
+              const chatIndex = copyArray.findIndex(chat => chat.id === sessionId)
+              
+              if(chatIndex > -1) {
+                // Update existing chat
+                copyArray[chatIndex] = newDataChat
+              } else {
+                // Add new chat
+                copyArray.push(newDataChat)
+              }
+              
+              setStorage('chat-history', copyArray)
+              return copyArray
+            })
+          } else {
+            console.log("Non-medical response - skipping history save");
+          }
+          
+          return newDataChat;
+        });
+        
+        SetIsLoad(false);
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        
+        // Hiển thị error trong UI
+        SetDataChat((prev) => ({
+          ...prev, 
+          chats:[
+            ...prev.chats,
+            ["start", ["⚠️ Lỗi, không thể kết nối với server. Vui lòng thử lại.", null]],
+          ]
+        }));
+        
+        // ❌ KHÔNG lưu error vào history
+        console.log("Connection error - not saving to history");
+        
+        SetIsLoad(false);
+      });
     }
   }
 
@@ -134,8 +281,28 @@ function ChatBot(props) {
   };
 
   const onAddChat = () => {
-    SetDataChat({
-      id: new Date().getTime(),
+    // Clear memory cho session hiện tại trước khi tạo mới
+    if (currentSessionId) {
+      fetch(`${API_BASE_URL}/clear/${sourceData}?session_id=${currentSessionId}`, {
+        method: "POST",
+        headers: new Headers({
+          "ngrok-skip-browser-warning": "69420",
+        }),
+      })
+      .then(() => {
+        console.log(`Memory cleared for session ${currentSessionId}`);
+      })
+      .catch((error) => {
+        console.error("Error clearing memory:", error);
+      });
+    }
+
+    // Tạo session mới
+    const newSessionId = new Date().getTime();
+    setCurrentSessionId(newSessionId);
+    
+    const newChat = {
+      id: newSessionId,
       name: 'New chat',
       chats: [
         [
@@ -146,7 +313,168 @@ function ChatBot(props) {
           ],
         ],
       ]
-      })
+    };
+    
+    SetDataChat(newChat);
+    
+    // ✅ THÊM NGAY VÀO CHAT HISTORY để hiển thị trong sidebar
+    SetChatHistory(prev => {
+      const updated = [...prev, newChat];
+      setStorage('chat-history', updated);
+      return updated;
+    });
+  }
+
+  // Function để load history khi chuyển sang chat cũ
+  const onSwitchChat = async (chat) => {
+    // Nếu đang ở chat này rồi thì không làm gì
+    if (dataChat.id === chat.id) {
+      console.log("Already on this chat");
+      return;
+    }
+    
+    // Switch UI ngay lập tức
+    SetDataChat(chat);
+    setCurrentSessionId(chat.id);
+    
+    // Extract chat history từ chat
+    const chatHistoryData = extractChatHistory(chat.chats);
+    
+    // ✅ CHỈ gọi API nếu có medical history để load
+    if (chatHistoryData.length > 0) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/load-history`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "69420",
+          },
+          body: JSON.stringify({
+            session_id: chat.id.toString(),
+            source: sourceData,
+            chat_history: chatHistoryData
+          }),
+          signal: AbortSignal.timeout(5000)  // Timeout 5s
+        });
+        
+        if (response.ok) {
+          console.log(`Loaded ${chatHistoryData.length} history items for chat ${chat.id}`);
+        } else {
+          console.error("Failed to load history");
+        }
+      } catch (error) {
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+          console.warn("Load history timeout - continuing anyway");
+        } else {
+          console.error("Error loading history:", error);
+        }
+      }
+    } else {
+      console.log("No medical history to load (greeting/irrelevant only)");
+    }
+  }
+
+  // Function để xóa chat
+  const onDeleteChat = async (e, chatToDelete) => {
+    e.stopPropagation(); // Prevent triggering onSwitchChat
+    
+    if (!confirm(`Bạn có chắc muốn xóa đoạn chat "${chatToDelete.name}"?`)) {
+      return;
+    }
+
+    // Xóa khỏi chatHistory (localStorage)
+    const updatedHistory = chatHistory.filter(chat => chat.id !== chatToDelete.id);
+    SetChatHistory(updatedHistory);
+    setStorage('chat-history', updatedHistory);
+
+    // ✅ Clear memory TẤT CẢ sources trên backend cho session này
+    try {
+      // Clear vi-medical memory
+      await fetch(`${API_BASE_URL}/clear/vi-medical?session_id=${chatToDelete.id}`, {
+        method: "POST",
+        headers: {
+          "ngrok-skip-browser-warning": "69420",
+        }
+      });
+      
+      // Clear wiki memory
+      await fetch(`${API_BASE_URL}/clear/wiki?session_id=${chatToDelete.id}`, {
+        method: "POST",
+        headers: {
+          "ngrok-skip-browser-warning": "69420",
+        }
+      });
+      
+      console.log(`✅ Cleared ALL memories for session ${chatToDelete.id} (vi-medical + wiki)`);
+    } catch (error) {
+      console.error("⚠️ Error clearing memory:", error);
+    }
+
+    // Nếu đang ở chat bị xóa, chuyển về chat mới
+    if (dataChat.id === chatToDelete.id) {
+      const newSessionId = new Date().getTime();
+      setCurrentSessionId(newSessionId);
+      SetDataChat({
+        id: newSessionId,
+        name: 'New chat',
+        chats: [
+          [
+            "start",
+            [
+              "Xin chào! Đây là Vi Medical Chatbot, Bạn đang có thắc mắc gì về vấn đề sức khoẻ - y tế?",
+              null,
+            ],
+          ],
+        ]
+      });
+    }
+  }
+
+  // Function để bắt đầu edit tên chat (double click)
+  const onStartEditChatName = (e, chat) => {
+    e.stopPropagation();
+    setEditingChatId(chat.id);
+    setEditingChatName(chat.name);
+  }
+
+  // Function để lưu tên chat mới
+  const onSaveChatName = (chatId) => {
+    if (editingChatName.trim() === "") {
+      alert("Tên chat không được để trống!");
+      return;
+    }
+
+    const updatedHistory = chatHistory.map(chat => 
+      chat.id === chatId 
+        ? { ...chat, name: editingChatName.trim() }
+        : chat
+    );
+    
+    SetChatHistory(updatedHistory);
+    setStorage('chat-history', updatedHistory);
+
+    // Nếu đang edit chat hiện tại, cập nhật dataChat
+    if (dataChat.id === chatId) {
+      SetDataChat(prev => ({ ...prev, name: editingChatName.trim() }));
+    }
+
+    setEditingChatId(null);
+    setEditingChatName("");
+  }
+
+  // Function để hủy edit
+  const onCancelEdit = () => {
+    setEditingChatId(null);
+    setEditingChatName("");
+  }
+
+  // Function để handle Enter key khi edit
+  const onEditKeyDown = (e, chatId) => {
+    if (e.key === 'Enter') {
+      onSaveChatName(chatId);
+    } else if (e.key === 'Escape') {
+      onCancelEdit();
+    }
   }
 
   return (
@@ -169,11 +497,47 @@ function ChatBot(props) {
               ""
             )}
             {chatHistory.map((chat, i) => (
-              <li key={i} onClick={() => SetDataChat(chat)}>
-                <p>
-                  <FontAwesomeIcon icon={faMessage} />
-                  {chat.name.length < 20 ? chat.name : chat.name.slice(0, 20) + "..."}
-                </p>
+              <li 
+                key={i} 
+                onClick={() => onSwitchChat(chat)}
+                className={`${dataChat.id === chat.id ? "bg-emerald-100" : ""} hover:bg-emerald-50 transition-colors`}
+              >
+                {editingChatId === chat.id ? (
+                  // Edit mode
+                  <div className="flex items-center gap-2 w-full" onClick={(e) => e.stopPropagation()}>
+                    <FontAwesomeIcon icon={faEdit} className="text-emerald-600" />
+                    <input
+                      type="text"
+                      value={editingChatName}
+                      onChange={(e) => setEditingChatName(e.target.value)}
+                      onKeyDown={(e) => onEditKeyDown(e, chat.id)}
+                      onBlur={() => onSaveChatName(chat.id)}
+                      className="flex-1 px-2 py-1 border border-emerald-300 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  // View mode
+                  <div className="flex items-center justify-between w-full group">
+                    <p 
+                      className="flex items-center gap-2 flex-1 cursor-pointer"
+                      onDoubleClick={(e) => onStartEditChatName(e, chat)}
+                      title="Double-click để đổi tên"
+                    >
+                      <FontAwesomeIcon icon={faMessage} />
+                      <span className="flex-1">
+                        {chat.name.length < 20 ? chat.name : chat.name.slice(0, 20) + "..."}
+                      </span>
+                    </p>
+                    <button
+                      onClick={(e) => onDeleteChat(e, chat)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1"
+                      title="Xóa đoạn chat"
+                    >
+                      <FontAwesomeIcon icon={faTrashAlt} />
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -197,7 +561,25 @@ function ChatBot(props) {
                   value={"wiki"}
                   checked={sourceData === "wiki"}
                   onChange={(e) => {
-                    SetSourceData(e.target.value);
+                    const newSource = e.target.value;
+                    
+                    // Clear memory của source cũ khi đổi source
+                    if (sourceData !== newSource && currentSessionId) {
+                      fetch(`${API_BASE_URL}/clear/${sourceData}?session_id=${currentSessionId}`, {
+                        method: "POST",
+                        headers: new Headers({
+                          "ngrok-skip-browser-warning": "69420",
+                        }),
+                      })
+                      .then(() => {
+                        console.log(`Memory cleared for ${sourceData}`);
+                      })
+                      .catch((error) => {
+                        console.error("Error clearing memory:", error);
+                      });
+                    }
+                    
+                    SetSourceData(newSource);
                   }}
                   className="radio checked:bg-emerald-500"
                 />
@@ -213,7 +595,25 @@ function ChatBot(props) {
                   type="radio"
                   checked={sourceData === "vi-medical"}
                   onChange={(e) => {
-                    SetSourceData(e.target.value);
+                    const newSource = e.target.value;
+                    
+                    // Clear memory của source cũ khi đổi source
+                    if (sourceData !== newSource && currentSessionId) {
+                      fetch(`${API_BASE_URL}/clear/${sourceData}?session_id=${currentSessionId}`, {
+                        method: "POST",
+                        headers: new Headers({
+                          "ngrok-skip-browser-warning": "69420",
+                        }),
+                      })
+                      .then(() => {
+                        console.log(`Memory cleared for ${sourceData}`);
+                      })
+                      .catch((error) => {
+                        console.error("Error clearing memory:", error);
+                      });
+                    }
+                    
+                    SetSourceData(newSource);
                   }}
                   name="radio-10"
                   className="radio checked:bg-emerald-500 selection:bg-emerald-400"
